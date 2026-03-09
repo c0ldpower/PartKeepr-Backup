@@ -141,4 +141,4 @@ backup_database
 backup_app_config
 
 #echo "PartKeepr backup finished\n"
-echo -e "${GREEN}PartKeepr backup finished\n${NC}"
+echo -e "${GREEN}PartKeepr backup finished${NC}"
