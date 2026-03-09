@@ -129,7 +129,7 @@ mkdir -p "$backup_path"
 
 # Run backups
 backup_database
-backup_app_data
+#backup_app_data
 backup_app_config
 
 echo "PartKeepr backup finished\n"
