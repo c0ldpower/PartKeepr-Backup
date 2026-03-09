@@ -22,6 +22,14 @@ echo "PartKeepr Backup $ver"
 # Source the script settings
 . ./partkeepr-backup.properties
 
+# ========================
+# COLOURS
+# ========================
+RED="\033[0;31m"
+GREEN="\033[0;32m"
+YELLOW="\033[1;33m"
+BLUE="\033[0;34m"
+NC="\033[0m"  # No Color / reset
 
 backup_database() {
 	local start=$(date +%s)
@@ -132,4 +140,5 @@ backup_database
 #backup_app_data
 backup_app_config
 
-echo "PartKeepr backup finished\n"
+#echo "PartKeepr backup finished\n"
+echo -e "${GREEN}PartKeepr backup finished\n${NC}"
