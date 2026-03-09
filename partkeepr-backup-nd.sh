@@ -47,8 +47,8 @@ backup_database() {
 	local start=$(date +%s)
 	local backup_file="${date_start}_partkeepr-database-backup.sql"
 
-	#echo "Database backup:" | tee -a "$backup_path/$log_file"
-	status info "Starting database backup..." | tee -a "$backup_path/$log_file"
+	status info "Starting database backup..."
+	echo "Database backup:" | tee -a "$backup_path/$log_file"	
 	echo "Retrieving database SQL..." | tee -a "$backup_path/$log_file"
 	res="$( ( mysqldump --opt --host=$database_host --user=$database_user $database_name > "$backup_path/$backup_file" ) 2>&1 )"
 	if $res
@@ -79,6 +79,7 @@ backup_app_data() {
 	local start=$(date +%s)
 	local backup_file="${date_start}_partkeepr-data-backup.zip"
 
+	status info "Backing up web data folder..."
 	echo "Web data backup:" | tee -a "$backup_path/$log_file"
 	echo "Compressing web data to ZIP archive..." | tee -a "$backup_path/$log_file"
 	# Zip with maximum compression. Run at low priority.
@@ -100,6 +101,7 @@ backup_app_config() {
 	local start=$(date +%s)
 	local backup_file="${date_start}_partkeepr-config-backup.zip"
 
+	status info "Backing up config files..."
 	echo "Web config backup:" | tee -a "$backup_path/$log_file"
 	echo "Compressing web config to ZIP archive..." | tee -a "$backup_path/$log_file"
 	# Zip with maximum compression. Run at low priority.
