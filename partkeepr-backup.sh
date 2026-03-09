@@ -29,7 +29,7 @@ backup_database() {
 
 	echo "Database backup:" | tee -a "$backup_path/$log_file"
 	echo "Retrieving database SQL..." | tee -a "$backup_path/$log_file"
-	res="$( ( mysqldump --opt --host=$database_host --user=$database_user --password=$database_pass $database_name > "$backup_path/$backup_file" ) 2>&1 )"
+	res="$( ( mysqldump --opt --host=$database_host --user=$database_user $database_name > "$backup_path/$backup_file" ) 2>&1 )"
 	if $res
 	then
 		echo "* Success" | tee -a "$backup_path/$log_file"
