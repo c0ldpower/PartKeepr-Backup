@@ -47,7 +47,8 @@ backup_database() {
 	local start=$(date +%s)
 	local backup_file="${date_start}_partkeepr-database-backup.sql"
 
-	echo "Database backup:" | tee -a "$backup_path/$log_file"
+	#echo "Database backup:" | tee -a "$backup_path/$log_file"
+	status info "Starting database backup..." | tee -a "$backup_path/$log_file"
 	echo "Retrieving database SQL..." | tee -a "$backup_path/$log_file"
 	res="$( ( mysqldump --opt --host=$database_host --user=$database_user $database_name > "$backup_path/$backup_file" ) 2>&1 )"
 	if $res
