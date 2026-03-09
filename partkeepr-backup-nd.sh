@@ -23,13 +23,25 @@ echo "PartKeepr Backup $ver"
 . ./partkeepr-backup.properties
 
 # ========================
-# COLOURS
+# COLOURS (ANSI escape codes)
 # ========================
 RED="\033[0;31m"
 GREEN="\033[0;32m"
 YELLOW="\033[1;33m"
 BLUE="\033[0;34m"
-NC="\033[0m"  # No Color / reset
+NC="\033[0m"  # reset colour
+
+# ========================
+# STATUS FUNCTION
+# ========================
+status() {
+    case "$1" in
+        ok)    echo "${GREEN}✔ $2${NC}" ;;
+        warn)  echo "${YELLOW}⚠ $2${NC}" ;;
+        fail)  echo "${RED}✖ $2${NC}" ;;
+        info)  echo "${BLUE}ℹ $2${NC}" ;;
+    esac
+}
 
 backup_database() {
 	local start=$(date +%s)
@@ -140,5 +152,9 @@ backup_database
 #backup_app_data
 backup_app_config
 
+# ========================
+# FINISHED
+# ========================
 #echo "PartKeepr backup finished\n"
-echo "${GREEN}PartKeepr backup finished${NC}"
+#echo "${GREEN}PartKeepr backup finished${NC}"
+status ok "PartKeepr backup finished succesfully"
