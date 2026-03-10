@@ -1,23 +1,20 @@
 #!/bin/sh
 # ========================
-# PartKeepr Backup Script (POSIX /bin/sh, secure, logging, safe permissions)
+# POSIX-safe PartKeepr backup with logging, colours, spinner
 # ========================
 
 # ------------------------
-# COLOURS
+# COLOURS (POSIX-safe)
 # ------------------------
-RED="\033[0;31m"
-GREEN="\033[0;32m"
-YELLOW="\033[1;33m"
-BLUE="\033[0;34m"
-NC="\033[0m"
+RED=$(printf '\033[0;31m')
+GREEN=$(printf '\033[0;32m')
+YELLOW=$(printf '\033[1;33m')
+BLUE=$(printf '\033[0;34m')
+NC=$(printf '\033[0m')
 
 # ------------------------
-# LOGGING FUNCTION (POSIX SAFE)
+# LOGGING FUNCTION
 # ------------------------
-		  
-		   
-
 log() {
     printf "%s\n" "$*" | tee -a "$LOG_FILE"
 }
@@ -41,7 +38,7 @@ spinner() {
     while kill -0 "$pid" 2>/dev/null; do
         i=$(( (i + 1) % 4 ))
         c=$(printf "%s" "$spin" | cut -c $((i + 1)))
-        printf "\r${BLUE}[%s] Working...${NC}" "$c"
+        printf "\r[%s] Working..." "$c"
         sleep 0.2
     done
     printf "\r"
@@ -57,14 +54,14 @@ run_with_spinner() {
 # LOAD CONFIG
 # ------------------------
 if [ -f "./partkeepr-backup-test.properties" ]; then
-    . ./partkeepr-backup-test.properties
+    . ./partkeepr-backup.properties
 else
-    echo "Configuration file partkeepr-backup.properties not found!"
+    echo "Configuration file partkeepr-backup-test.properties not found!"
     exit 1
 fi
 
 # ------------------------
-# ENSURE BACKUP DIR EXISTS AND IS WRITABLE
+# ENSURE BACKUP DIR EXISTS
 # ------------------------
 mkdir -p "$BACKUP_DIR" || { echo "Cannot create backup directory $BACKUP_DIR"; exit 1; }
 chmod 700 "$BACKUP_DIR"
@@ -84,7 +81,6 @@ touch "$LOG_FILE" || { echo "Cannot create log file $LOG_FILE"; exit 1; }
 # ------------------------
 BACKUP_WEB_DATA=true
 ONLY_DB=false
-
 for arg in "$@"; do
     case "$arg" in
         --no-data)
@@ -103,7 +99,7 @@ done
 # ------------------------
 # CONSISTENT TIMESTAMP
 # ------------------------
-BACKUP_TIMESTAMP=$(date +%Y%m%d_%H%M)  # no seconds
+BACKUP_TIMESTAMP=$(date +%Y%m%d_%H%M)
 MONTH=$(date +%Y-%m)
 BACKUP_MONTH_DIR="$BACKUP_DIR/$MONTH"
 mkdir -p "$BACKUP_MONTH_DIR" || { status fail "Cannot create month backup dir"; exit 1; }
@@ -163,14 +159,14 @@ else
 fi
 
 # ------------------------
-# CLEANUP OLD BACKUPS (6 months / 180 days)
+# CLEANUP OLD BACKUPS (6 months)
 # ------------------------
 status info "Cleaning backups older than 180 days..."
 find "$BACKUP_DIR" -mindepth 1 -maxdepth 1 -type d -mtime +180 -exec rm -rf {} \;
 status ok "Old backups cleaned"
 
 # ------------------------
-# ROTATE LOGS (6 months / 180 days)
+# ROTATE LOGS (6 months)
 # ------------------------
 status info "Cleaning logs older than 180 days..."
 find "$LOG_DIR" -type f -name "*.log" -mtime +180 -exec rm -f {} \;
