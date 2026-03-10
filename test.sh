@@ -56,10 +56,10 @@ run_with_spinner() {
 # ------------------------
 # LOAD CONFIG
 # ------------------------
-if [ -f "./partkeepr-backup.properties" ]; then
+if [ -f "./partkeepr-backup-test.properties" ]; then
     . ./partkeepr-backup.properties
 else
-    echo "Configuration file partkeepr-backup.properties not found!"
+    echo "Configuration file partkeepr-backup-test.properties not found!"
     exit 1
 fi
 
