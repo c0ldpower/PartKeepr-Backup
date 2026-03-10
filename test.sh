@@ -1,6 +1,6 @@
 #!/bin/sh
 # ========================
-# PartKeepr Backup Script (POSIX /bin/sh, secure, logging)
+# PartKeepr Backup Script (POSIX /bin/sh, secure, logging, safe permissions)
 # ========================
 
 # ------------------------
@@ -15,8 +15,8 @@ NC="\033[0m"
 # ------------------------
 # LOGGING FUNCTION (POSIX SAFE)
 # ------------------------
-LOG_DIR=""
-LOG_FILE=""
+		  
+		   
 
 log() {
     printf "%s\n" "$*" | tee -a "$LOG_FILE"
@@ -57,19 +57,27 @@ run_with_spinner() {
 # LOAD CONFIG
 # ------------------------
 if [ -f "./partkeepr-backup-test.properties" ]; then
-    . ./partkeepr-backup.properties
+    . ./partkeepr-backup-test.properties
 else
-    echo "Configuration file partkeepr-backup-test.properties not found!"
+    echo "Configuration file partkeepr-backup.properties not found!"
     exit 1
 fi
+
+# ------------------------
+# ENSURE BACKUP DIR EXISTS AND IS WRITABLE
+# ------------------------
+mkdir -p "$BACKUP_DIR" || { echo "Cannot create backup directory $BACKUP_DIR"; exit 1; }
+chmod 700 "$BACKUP_DIR"
 
 # ------------------------
 # LOG FILE SETUP
 # ------------------------
 LOG_DIR="$BACKUP_DIR/logs"
-mkdir -p "$LOG_DIR"
+mkdir -p "$LOG_DIR" || { echo "Cannot create log directory $LOG_DIR"; exit 1; }
+chmod 700 "$LOG_DIR"
+
 LOG_FILE="$LOG_DIR/partkeepr-backup-$(date +%Y-%m-%d).log"
-: > "$LOG_FILE"  # create/empty log file
+touch "$LOG_FILE" || { echo "Cannot create log file $LOG_FILE"; exit 1; }
 
 # ------------------------
 # FLAGS
@@ -98,7 +106,7 @@ done
 BACKUP_TIMESTAMP=$(date +%Y%m%d_%H%M)  # no seconds
 MONTH=$(date +%Y-%m)
 BACKUP_MONTH_DIR="$BACKUP_DIR/$MONTH"
-mkdir -p "$BACKUP_MONTH_DIR"
+mkdir -p "$BACKUP_MONTH_DIR" || { status fail "Cannot create month backup dir"; exit 1; }
 
 # ------------------------
 # DATABASE BACKUP
@@ -155,14 +163,14 @@ else
 fi
 
 # ------------------------
-# CLEANUP OLD BACKUPS (6 months)
+# CLEANUP OLD BACKUPS (6 months / 180 days)
 # ------------------------
 status info "Cleaning backups older than 180 days..."
 find "$BACKUP_DIR" -mindepth 1 -maxdepth 1 -type d -mtime +180 -exec rm -rf {} \;
 status ok "Old backups cleaned"
 
 # ------------------------
-# ROTATE LOGS (6 months)
+# ROTATE LOGS (6 months / 180 days)
 # ------------------------
 status info "Cleaning logs older than 180 days..."
 find "$LOG_DIR" -type f -name "*.log" -mtime +180 -exec rm -f {} \;
