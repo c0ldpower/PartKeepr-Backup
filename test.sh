@@ -1,6 +1,6 @@
 #!/bin/bash
 # ========================
-# PartKeepr Backup - Bash version
+# PartKeepr Backup - Bash version with safe directory handling
 # ========================
 
 # ------------------------
@@ -15,13 +15,6 @@ NC="\033[0m"
 # ------------------------
 # LOGGING
 # ------------------------
-ensure_dir() {
-    local dir="$1"
-    if [[ ! -d "$dir" ]]; then
-        mkdir -p "$dir" || { echo "Cannot create directory $dir"; exit 1; }
-    fi
-}
-
 log() {
     printf "%b\n" "$*" | tee -a "$LOG_FILE"
 }
@@ -59,11 +52,12 @@ run_with_spinner() {
 # ------------------------
 # LOAD CONFIG
 # ------------------------
-if [[ ! -f "./partkeepr-backup-test.properties" ]]; then
-    echo "Configuration file partkeepr-backup-test.properties not found!"
+CONFIG_FILE="./partkeepr-backup-test.properties"
+if [[ ! -f "$CONFIG_FILE" ]]; then
+    echo "Configuration file $CONFIG_FILE not found!"
     exit 1
 fi
-source ./partkeepr-backup-test.properties
+source "$CONFIG_FILE"
 
 # ------------------------
 # FLAGS
@@ -92,15 +86,16 @@ BACKUP_TIMESTAMP=$(date +%Y%m%d_%H%M)
 MONTH=$(date +%Y-%m)
 
 # ------------------------
-# ENSURE DIRECTORIES
+# SAFE DIRECTORY CREATION (minimal change)
 # ------------------------
-ensure_dir "$BACKUP_DIR"
+[[ ! -d "$BACKUP_DIR" ]] && mkdir -p "$BACKUP_DIR" || { status fail "Cannot create backup directory $BACKUP_DIR"; exit 1; }
 BACKUP_MONTH_DIR="$BACKUP_DIR/$MONTH"
-ensure_dir "$BACKUP_MONTH_DIR"
+[[ ! -d "$BACKUP_MONTH_DIR" ]] && mkdir -p "$BACKUP_MONTH_DIR" || { status fail "Cannot create month backup dir $BACKUP_MONTH_DIR"; exit 1; }
 LOG_DIR="$BACKUP_DIR/logs"
-ensure_dir "$LOG_DIR"
+[[ ! -d "$LOG_DIR" ]] && mkdir -p "$LOG_DIR" || { status fail "Cannot create log directory $LOG_DIR"; exit 1; }
 
 LOG_FILE="$LOG_DIR/partkeepr-backup-$(date +%Y-%m-%d).log"
+[[ ! -f "$LOG_FILE" ]] && touch "$LOG_FILE" || { status fail "Cannot create log file $LOG_FILE"; exit 1; }
 
 # ------------------------
 # DATABASE BACKUP
