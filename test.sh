@@ -1,22 +1,29 @@
-#!/bin/sh
+#!/bin/bash
 # ========================
-# POSIX-safe PartKeepr backup with logging, colours, spinner
+# PartKeepr Backup - Bash version
 # ========================
 
 # ------------------------
-# COLOURS (POSIX-safe)
+# COLOURS
 # ------------------------
-RED=$(printf '\033[0;31m')
-GREEN=$(printf '\033[0;32m')
-YELLOW=$(printf '\033[1;33m')
-BLUE=$(printf '\033[0;34m')
-NC=$(printf '\033[0m')
+RED="\033[0;31m"
+GREEN="\033[0;32m"
+YELLOW="\033[1;33m"
+BLUE="\033[0;34m"
+NC="\033[0m"
 
 # ------------------------
-# LOGGING FUNCTION
+# LOGGING
 # ------------------------
+ensure_dir() {
+    local dir="$1"
+    if [[ ! -d "$dir" ]]; then
+        mkdir -p "$dir" || { echo "Cannot create directory $dir"; exit 1; }
+    fi
+}
+
 log() {
-    printf "%s\n" "$*" | tee -a "$LOG_FILE"
+    printf "%b\n" "$*" | tee -a "$LOG_FILE"
 }
 
 status() {
@@ -29,16 +36,15 @@ status() {
 }
 
 # ------------------------
-# POSIX SPINNER
+# SPINNER
 # ------------------------
 spinner() {
-    pid=$1
-    spin='-\|/'
-    i=0
+    local pid=$1
+    local spin='-\|/'
+    local i=0
     while kill -0 "$pid" 2>/dev/null; do
         i=$(( (i + 1) % 4 ))
-        c=$(printf "%s" "$spin" | cut -c $((i + 1)))
-        printf "\r[%s] Working..." "$c"
+        printf "\r[%c] Working..." "${spin:$i:1}"
         sleep 0.2
     done
     printf "\r"
@@ -53,28 +59,11 @@ run_with_spinner() {
 # ------------------------
 # LOAD CONFIG
 # ------------------------
-if [ -f "./partkeepr-backup-test.properties" ]; then
-    . ./partkeepr-backup.properties
-else
-    echo "Configuration file partkeepr-backup-test.properties not found!"
+if [[ ! -f "./partkeepr-backup.properties" ]]; then
+    echo "Configuration file partkeepr-backup.properties not found!"
     exit 1
 fi
-
-# ------------------------
-# ENSURE BACKUP DIR EXISTS
-# ------------------------
-mkdir -p "$BACKUP_DIR" || { echo "Cannot create backup directory $BACKUP_DIR"; exit 1; }
-chmod 700 "$BACKUP_DIR"
-
-# ------------------------
-# LOG FILE SETUP
-# ------------------------
-LOG_DIR="$BACKUP_DIR/logs"
-mkdir -p "$LOG_DIR" || { echo "Cannot create log directory $LOG_DIR"; exit 1; }
-chmod 700 "$LOG_DIR"
-
-LOG_FILE="$LOG_DIR/partkeepr-backup-$(date +%Y-%m-%d).log"
-touch "$LOG_FILE" || { echo "Cannot create log file $LOG_FILE"; exit 1; }
+source ./partkeepr-backup.properties
 
 # ------------------------
 # FLAGS
@@ -97,38 +86,36 @@ for arg in "$@"; do
 done
 
 # ------------------------
-# CONSISTENT TIMESTAMP
+# TIMESTAMP & MONTH
 # ------------------------
 BACKUP_TIMESTAMP=$(date +%Y%m%d_%H%M)
 MONTH=$(date +%Y-%m)
+
+# ------------------------
+# ENSURE DIRECTORIES
+# ------------------------
+ensure_dir "$BACKUP_DIR"
 BACKUP_MONTH_DIR="$BACKUP_DIR/$MONTH"
-mkdir -p "$BACKUP_MONTH_DIR" || { status fail "Cannot create month backup dir"; exit 1; }
+ensure_dir "$BACKUP_MONTH_DIR"
+LOG_DIR="$BACKUP_DIR/logs"
+ensure_dir "$LOG_DIR"
+
+LOG_FILE="$LOG_DIR/partkeepr-backup-$(date +%Y-%m-%d).log"
 
 # ------------------------
 # DATABASE BACKUP
 # ------------------------
 status info "Creating database dump..."
 SQL_FILE="$BACKUP_MONTH_DIR/partkeepr-db-$BACKUP_TIMESTAMP.sql"
-
-if run_with_spinner sh -c "mysqldump $DB_NAME > '$SQL_FILE'"; then
-    status ok "Database dump created"
-else
-    status fail "Database dump failed"
-    exit 1
-fi
+run_with_spinner mysqldump "$DB_NAME" > "$SQL_FILE" && status ok "Database dump created" || { status fail "Database dump failed"; exit 1; }
 
 status info "Compressing database backup..."
-if run_with_spinner zip -q "$SQL_FILE.zip" "$SQL_FILE"; then
-    rm "$SQL_FILE"
-    status ok "Database compressed"
-else
-    status fail "Database compression failed"
-fi
+run_with_spinner zip -q "$SQL_FILE.zip" "$SQL_FILE" && rm "$SQL_FILE" && status ok "Database compressed" || status fail "Database compression failed"
 
 # ------------------------
 # ONLY DB MODE
 # ------------------------
-if [ "$ONLY_DB" = true ]; then
+if [[ "$ONLY_DB" == true ]]; then
     status info "Only database backup requested"
     status ok "PartKeepr backup finished"
     exit 0
@@ -137,13 +124,9 @@ fi
 # ------------------------
 # WEB DATA BACKUP
 # ------------------------
-if [ "$BACKUP_WEB_DATA" = true ]; then
+if [[ "$BACKUP_WEB_DATA" == true ]]; then
     status info "Backing up web data folder..."
-    if run_with_spinner zip -qr "$BACKUP_MONTH_DIR/partkeepr-data-$BACKUP_TIMESTAMP.zip" "$WEB_DATA_PATH"; then
-        status ok "Web data backup completed"
-    else
-        status fail "Web data backup failed"
-    fi
+    run_with_spinner zip -qr "$BACKUP_MONTH_DIR/partkeepr-data-$BACKUP_TIMESTAMP.zip" "$WEB_DATA_PATH" && status ok "Web data backup completed" || status fail "Web data backup failed"
 else
     status warn "Skipping web data backup"
 fi
@@ -152,21 +135,17 @@ fi
 # CONFIG BACKUP
 # ------------------------
 status info "Backing up config folder..."
-if run_with_spinner zip -qr "$BACKUP_MONTH_DIR/partkeepr-config-$BACKUP_TIMESTAMP.zip" "$CONFIG_PATH"; then
-    status ok "Config backup completed"
-else
-    status fail "Config backup failed"
-fi
+run_with_spinner zip -qr "$BACKUP_MONTH_DIR/partkeepr-config-$BACKUP_TIMESTAMP.zip" "$CONFIG_PATH" && status ok "Config backup completed" || status fail "Config backup failed"
 
 # ------------------------
-# CLEANUP OLD BACKUPS (6 months)
+# CLEANUP OLD BACKUPS (6 months / 180 days)
 # ------------------------
 status info "Cleaning backups older than 180 days..."
 find "$BACKUP_DIR" -mindepth 1 -maxdepth 1 -type d -mtime +180 -exec rm -rf {} \;
 status ok "Old backups cleaned"
 
 # ------------------------
-# ROTATE LOGS (6 months)
+# ROTATE LOGS (6 months / 180 days)
 # ------------------------
 status info "Cleaning logs older than 180 days..."
 find "$LOG_DIR" -type f -name "*.log" -mtime +180 -exec rm -f {} \;
