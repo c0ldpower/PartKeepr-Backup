@@ -1,6 +1,6 @@
 #!/bin/sh
 # ========================
-# PartKeepr Backup Script (POSIX /bin/sh, secure, consistent timestamp)
+# PartKeepr Backup Script (POSIX /bin/sh, secure, logging)
 # ========================
 
 # ------------------------
@@ -12,17 +12,27 @@ YELLOW="\033[1;33m"
 BLUE="\033[0;34m"
 NC="\033[0m"
 
+# ------------------------
+# LOGGING FUNCTION (POSIX SAFE)
+# ------------------------
+LOG_DIR=""
+LOG_FILE=""
+
+log() {
+    printf "%s\n" "$*" | tee -a "$LOG_FILE"
+}
+
 status() {
     case "$1" in
-        ok)   printf "${GREEN}✔ %s${NC}\n" "$2" ;;
-        warn) printf "${YELLOW}⚠ %s${NC}\n" "$2" ;;
-        fail) printf "${RED}✖ %s${NC}\n" "$2" ;;
-        info) printf "${BLUE}ℹ %s${NC}\n" "$2" ;;
+        ok)   log "${GREEN}✔ $2${NC}" ;;
+        warn) log "${YELLOW}⚠ $2${NC}" ;;
+        fail) log "${RED}✖ $2${NC}" ;;
+        info) log "${BLUE}ℹ $2${NC}" ;;
     esac
 }
 
 # ------------------------
-# SPINNER (POSIX SAFE)
+# POSIX SPINNER
 # ------------------------
 spinner() {
     pid=$1
@@ -46,22 +56,20 @@ run_with_spinner() {
 # ------------------------
 # LOAD CONFIG
 # ------------------------
-if [ -f "./partkeepr-backup-test.properties" ]; then
-    . ./partkeepr-backup-test.properties
+if [ -f "./partkeepr-backup.properties" ]; then
+    . ./partkeepr-backup.properties
 else
-    status fail "Configuration file partkeepr-backup.properties not found!"
+    echo "Configuration file partkeepr-backup.properties not found!"
     exit 1
 fi
 
 # ------------------------
-# LOGGING SETUP
+# LOG FILE SETUP
 # ------------------------
 LOG_DIR="$BACKUP_DIR/logs"
 mkdir -p "$LOG_DIR"
 LOG_FILE="$LOG_DIR/partkeepr-backup-$(date +%Y-%m-%d).log"
-
-# Redirect all stdout/stderr to log and console
-exec > >(tee -a "$LOG_FILE") 2>&1
+: > "$LOG_FILE"  # create/empty log file
 
 # ------------------------
 # FLAGS
@@ -87,7 +95,7 @@ done
 # ------------------------
 # CONSISTENT TIMESTAMP
 # ------------------------
-BACKUP_TIMESTAMP=$(date +%Y%m%d_%H%M)  # no seconds, consistent for this run
+BACKUP_TIMESTAMP=$(date +%Y%m%d_%H%M)  # no seconds
 MONTH=$(date +%Y-%m)
 BACKUP_MONTH_DIR="$BACKUP_DIR/$MONTH"
 mkdir -p "$BACKUP_MONTH_DIR"
@@ -123,7 +131,7 @@ if [ "$ONLY_DB" = true ]; then
 fi
 
 # ------------------------
-# DATA BACKUP
+# WEB DATA BACKUP
 # ------------------------
 if [ "$BACKUP_WEB_DATA" = true ]; then
     status info "Backing up web data folder..."
@@ -148,14 +156,14 @@ fi
 
 # ------------------------
 # CLEANUP OLD BACKUPS (6 months)
-# ========================
+# ------------------------
 status info "Cleaning backups older than 180 days..."
 find "$BACKUP_DIR" -mindepth 1 -maxdepth 1 -type d -mtime +180 -exec rm -rf {} \;
 status ok "Old backups cleaned"
 
 # ------------------------
 # ROTATE LOGS (6 months)
-# ========================
+# ------------------------
 status info "Cleaning logs older than 180 days..."
 find "$LOG_DIR" -type f -name "*.log" -mtime +180 -exec rm -f {} \;
 status ok "Old logs cleaned"
