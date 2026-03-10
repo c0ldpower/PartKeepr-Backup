@@ -19,6 +19,29 @@
 ver="0.1.3"
 echo "PartKeepr Backup $ver"
 
+# ——————————————
+# Command line options
+# ——————————————
+
+ONLY_DB=0
+NO_DATA=0
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --only-db)
+            ONLY_DB=1
+            shift
+            ;;
+        --no-data)
+            NO_DATA=1
+            shift
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
+
 # Source the script settings
 . ./partkeepr-backup.properties
 
@@ -151,9 +174,19 @@ echo "* Log: $log_file\n"
 mkdir -p "$backup_path"
 
 # Run backups
+
+# always run database backup
 backup_database
-#backup_app_data
-backup_app_config
+
+# data folder backup (unless requested not to)
+if [ "$NO_DATA" -eq 0 ] && [ "$ONLY_DB" -eq 0 ]; then
+    backup_app_data
+fi
+
+# only run config if NOT only-db
+if [ "$ONLY_DB" -eq 0 ]; then
+    backup_app_config
+fi
 
 # ========================
 # FINISHED
