@@ -1,8 +1,11 @@
 #!/bin/sh
+# ========================
+# PartKeepr Backup Script (POSIX /bin/sh, secure, consistent timestamp)
+# ========================
 
-# ========================
+# ------------------------
 # COLOURS
-# ========================
+# ------------------------
 RED="\033[0;31m"
 GREEN="\033[0;32m"
 YELLOW="\033[1;33m"
@@ -11,16 +14,16 @@ NC="\033[0m"
 
 status() {
     case "$1" in
-        ok)   echo "${GREEN}✔ $2${NC}" ;;
-        warn) echo "${YELLOW}⚠ $2${NC}" ;;
-        fail) echo "${RED}✖ $2${NC}" ;;
-        info) echo "${BLUE}ℹ $2${NC}" ;;
+        ok)   printf "${GREEN}✔ %s${NC}\n" "$2" ;;
+        warn) printf "${YELLOW}⚠ %s${NC}\n" "$2" ;;
+        fail) printf "${RED}✖ %s${NC}\n" "$2" ;;
+        info) printf "${BLUE}ℹ %s${NC}\n" "$2" ;;
     esac
 }
 
-# ========================
-# SPINNER
-# ========================
+# ------------------------
+# SPINNER (POSIX SAFE)
+# ------------------------
 spinner() {
     pid=$1
     spin='-\|/'
@@ -38,12 +41,11 @@ run_with_spinner() {
     "$@" &
     spinner $!
     wait $!
-    return $?
 }
 
-# ========================
+# ------------------------
 # LOAD CONFIG
-# ========================
+# ------------------------
 if [ -f "./partkeepr-backup-test.properties" ]; then
     . ./partkeepr-backup-test.properties
 else
@@ -51,9 +53,19 @@ else
     exit 1
 fi
 
-# ========================
+# ------------------------
+# LOGGING SETUP
+# ------------------------
+LOG_DIR="$BACKUP_DIR/logs"
+mkdir -p "$LOG_DIR"
+LOG_FILE="$LOG_DIR/partkeepr-backup-$(date +%Y-%m-%d).log"
+
+# Redirect all stdout/stderr to log and console
+exec > >(tee -a "$LOG_FILE") 2>&1
+
+# ------------------------
 # FLAGS
-# ========================
+# ------------------------
 BACKUP_WEB_DATA=true
 ONLY_DB=false
 
@@ -72,24 +84,21 @@ for arg in "$@"; do
     esac
 done
 
-# ========================
-# BACKUP PATHS
-# ========================
-DATE=$(date +%Y%m%d_%H%M%S)
+# ------------------------
+# CONSISTENT TIMESTAMP
+# ------------------------
+BACKUP_TIMESTAMP=$(date +%Y%m%d_%H%M)  # no seconds, consistent for this run
 MONTH=$(date +%Y-%m)
-
 BACKUP_MONTH_DIR="$BACKUP_DIR/$MONTH"
 mkdir -p "$BACKUP_MONTH_DIR"
 
-# ========================
+# ------------------------
 # DATABASE BACKUP
-# ========================
+# ------------------------
 status info "Creating database dump..."
+SQL_FILE="$BACKUP_MONTH_DIR/partkeepr-db-$BACKUP_TIMESTAMP.sql"
 
-SQL_FILE="$BACKUP_MONTH_DIR/partkeepr-db-$DATE.sql"
-
-if run_with_spinner mysqldump "$DB_NAME" > "$SQL_FILE"
-then
+if run_with_spinner sh -c "mysqldump $DB_NAME > '$SQL_FILE'"; then
     status ok "Database dump created"
 else
     status fail "Database dump failed"
@@ -97,34 +106,28 @@ else
 fi
 
 status info "Compressing database backup..."
-
-if run_with_spinner zip -q "$SQL_FILE.zip" "$SQL_FILE"
-then
+if run_with_spinner zip -q "$SQL_FILE.zip" "$SQL_FILE"; then
     rm "$SQL_FILE"
     status ok "Database compressed"
 else
     status fail "Database compression failed"
 fi
 
-# ========================
+# ------------------------
 # ONLY DB MODE
-# ========================
+# ------------------------
 if [ "$ONLY_DB" = true ]; then
     status info "Only database backup requested"
     status ok "PartKeepr backup finished"
     exit 0
 fi
 
-# ========================
+# ------------------------
 # DATA BACKUP
-# ========================
+# ------------------------
 if [ "$BACKUP_WEB_DATA" = true ]; then
     status info "Backing up web data folder..."
-
-    if run_with_spinner zip -qr \
-        "$BACKUP_MONTH_DIR/partkeepr-data-$DATE.zip" \
-        "$WEB_DATA_PATH"
-    then
+    if run_with_spinner zip -qr "$BACKUP_MONTH_DIR/partkeepr-data-$BACKUP_TIMESTAMP.zip" "$WEB_DATA_PATH"; then
         status ok "Web data backup completed"
     else
         status fail "Web data backup failed"
@@ -133,22 +136,32 @@ else
     status warn "Skipping web data backup"
 fi
 
-# ========================
+# ------------------------
 # CONFIG BACKUP
-# ========================
+# ------------------------
 status info "Backing up config folder..."
-
-if run_with_spinner zip -qr \
-    "$BACKUP_MONTH_DIR/partkeepr-config-$DATE.zip" \
-    "$CONFIG_PATH"
-then
+if run_with_spinner zip -qr "$BACKUP_MONTH_DIR/partkeepr-config-$BACKUP_TIMESTAMP.zip" "$CONFIG_PATH"; then
     status ok "Config backup completed"
 else
     status fail "Config backup failed"
 fi
 
+# ------------------------
+# CLEANUP OLD BACKUPS (6 months)
 # ========================
+status info "Cleaning backups older than 180 days..."
+find "$BACKUP_DIR" -mindepth 1 -maxdepth 1 -type d -mtime +180 -exec rm -rf {} \;
+status ok "Old backups cleaned"
+
+# ------------------------
+# ROTATE LOGS (6 months)
+# ========================
+status info "Cleaning logs older than 180 days..."
+find "$LOG_DIR" -type f -name "*.log" -mtime +180 -exec rm -f {} \;
+status ok "Old logs cleaned"
+
+# ------------------------
 # FINISHED
-# ========================
+# ------------------------
 status ok "PartKeepr backup finished"
 status info "Backup location: $BACKUP_MONTH_DIR"
