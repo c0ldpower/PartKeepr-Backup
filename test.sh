@@ -28,8 +28,8 @@ status() {
 # LOAD CONFIG
 # ------------------------
 # Make sure partkeepr-backup.properties exists and uses shell-compatible syntax
-if [ -f "./partkeepr-backup.properties" ]; then
-    . ./partkeepr-backup.properties
+if [ -f "./partkeepr-backup-test.properties" ]; then
+    . ./partkeepr-backup-test.properties
 else
     status fail "Configuration file partkeepr-backup.properties not found!"
     exit 1
