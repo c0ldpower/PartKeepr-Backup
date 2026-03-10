@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # ========================
 # COLOURS
@@ -26,8 +26,9 @@ spinner() {
     spin='-\|/'
     i=0
     while kill -0 "$pid" 2>/dev/null; do
-        i=$(( (i+1) %4 ))
-        printf "\r${BLUE}[%c] Working...${NC}" "${spin:$i:1}"
+        i=$(( (i + 1) % 4 ))
+        c=$(printf "%s" "$spin" | cut -c $((i + 1)))
+        printf "\r${BLUE}[%s] Working...${NC}" "$c"
         sleep 0.2
     done
     printf "\r"
