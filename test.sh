@@ -1,33 +1,48 @@
 #!/bin/sh
-# ========================
-# PartKeepr Backup Script (POSIX sh, secure)
-# ========================
 
-# ------------------------
-# COLOURS (ANSI codes)
-# ------------------------
+# ========================
+# COLOURS
+# ========================
 RED="\033[0;31m"
 GREEN="\033[0;32m"
 YELLOW="\033[1;33m"
 BLUE="\033[0;34m"
-NC="\033[0m"  # reset colour
+NC="\033[0m"
 
-# ------------------------
-# STATUS FUNCTION
-# ------------------------
 status() {
     case "$1" in
-        ok)    echo "${GREEN}✔ $2${NC}" ;;
-        warn)  echo "${YELLOW}⚠ $2${NC}" ;;
-        fail)  echo "${RED}✖ $2${NC}" ;;
-        info)  echo "${BLUE}ℹ $2${NC}" ;;
+        ok)   echo "${GREEN}✔ $2${NC}" ;;
+        warn) echo "${YELLOW}⚠ $2${NC}" ;;
+        fail) echo "${RED}✖ $2${NC}" ;;
+        info) echo "${BLUE}ℹ $2${NC}" ;;
     esac
 }
 
-# ------------------------
+# ========================
+# SPINNER
+# ========================
+spinner() {
+    pid=$1
+    spin='-\|/'
+    i=0
+    while kill -0 "$pid" 2>/dev/null; do
+        i=$(( (i+1) %4 ))
+        printf "\r${BLUE}[%c] Working...${NC}" "${spin:$i:1}"
+        sleep 0.2
+    done
+    printf "\r"
+}
+
+run_with_spinner() {
+    "$@" &
+    spinner $!
+    wait $!
+    return $?
+}
+
+# ========================
 # LOAD CONFIG
-# ------------------------
-# Make sure partkeepr-backup.properties exists and uses shell-compatible syntax
+# ========================
 if [ -f "./partkeepr-backup-test.properties" ]; then
     . ./partkeepr-backup-test.properties
 else
@@ -35,15 +50,12 @@ else
     exit 1
 fi
 
-# ------------------------
-# DEFAULT FLAGS
-# ------------------------
+# ========================
+# FLAGS
+# ========================
 BACKUP_WEB_DATA=true
 ONLY_DB=false
 
-# ------------------------
-# PARSE COMMAND-LINE ARGUMENTS
-# ------------------------
 for arg in "$@"; do
     case "$arg" in
         --no-data)
@@ -59,57 +71,83 @@ for arg in "$@"; do
     esac
 done
 
-# ------------------------
-# PREPARE BACKUP DIRECTORY
-# ------------------------
+# ========================
+# BACKUP PATHS
+# ========================
 DATE=$(date +%Y%m%d_%H%M%S)
-mkdir -p "$BACKUP_DIR"
+MONTH=$(date +%Y-%m)
 
-# ------------------------
-# DATABASE BACKUP (secure via ~/.my.cnf)
-# ------------------------
-status info "Starting database backup..."
-if mysqldump "$DB_NAME" > "$BACKUP_DIR/partkeepr-db-$DATE.sql"; then
-    status ok "Database backup completed"
+BACKUP_MONTH_DIR="$BACKUP_DIR/$MONTH"
+mkdir -p "$BACKUP_MONTH_DIR"
+
+# ========================
+# DATABASE BACKUP
+# ========================
+status info "Creating database dump..."
+
+SQL_FILE="$BACKUP_MONTH_DIR/partkeepr-db-$DATE.sql"
+
+if run_with_spinner mysqldump "$DB_NAME" > "$SQL_FILE"
+then
+    status ok "Database dump created"
 else
-    status fail "Database backup failed!"
+    status fail "Database dump failed"
     exit 1
 fi
 
-# ------------------------
-# EXIT IF ONLY_DB FLAG
-# ------------------------
+status info "Compressing database backup..."
+
+if run_with_spinner zip -q "$SQL_FILE.zip" "$SQL_FILE"
+then
+    rm "$SQL_FILE"
+    status ok "Database compressed"
+else
+    status fail "Database compression failed"
+fi
+
+# ========================
+# ONLY DB MODE
+# ========================
 if [ "$ONLY_DB" = true ]; then
-    status info "Only database backup requested, skipping other backups."
+    status info "Only database backup requested"
     status ok "PartKeepr backup finished"
     exit 0
 fi
 
-# ------------------------
-# WEB DATA BACKUP (optional)
-# ------------------------
+# ========================
+# DATA BACKUP
+# ========================
 if [ "$BACKUP_WEB_DATA" = true ]; then
     status info "Backing up web data folder..."
-    if zip -r "${BACKUP_DIR}/partkeepr-data-$DATE.zip" "$WEB_DATA_PATH"; then
+
+    if run_with_spinner zip -qr \
+        "$BACKUP_MONTH_DIR/partkeepr-data-$DATE.zip" \
+        "$WEB_DATA_PATH"
+    then
         status ok "Web data backup completed"
     else
-        status fail "Web data backup failed!"
+        status fail "Web data backup failed"
     fi
 else
-    status warn "Skipping web data folder backup"
+    status warn "Skipping web data backup"
 fi
 
-# ------------------------
+# ========================
 # CONFIG BACKUP
-# ------------------------
-status info "Backing up config files..."
-if zip -r "${BACKUP_DIR}/partkeepr-config-$DATE.zip" "$CONFIG_PATH"; then
+# ========================
+status info "Backing up config folder..."
+
+if run_with_spinner zip -qr \
+    "$BACKUP_MONTH_DIR/partkeepr-config-$DATE.zip" \
+    "$CONFIG_PATH"
+then
     status ok "Config backup completed"
 else
-    status fail "Config backup failed!"
+    status fail "Config backup failed"
 fi
 
-# ------------------------
+# ========================
 # FINISHED
-# ------------------------
+# ========================
 status ok "PartKeepr backup finished"
+status info "Backup location: $BACKUP_MONTH_DIR"
