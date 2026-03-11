@@ -16,7 +16,7 @@
 # - Licence: MIT (see the LICENSE file)
 
 
-ver="0.1.3"
+ver="0.1.3.002"
 echo "PartKeepr Backup $ver"
 
 # ——————————————
@@ -66,6 +66,11 @@ status() {
     esac
 }
 
+
+############################
+# DATABASE BACKUP
+############################
+status info "Starting database backup..."
 backup_database() {
 	local start=$(date +%s)
 	local backup_file="${date_start}_partkeepr-database-backup.sql"
@@ -76,20 +81,20 @@ backup_database() {
 	res="$( ( mysqldump --opt --host=$database_host --user=$database_user $database_name > "$backup_path/$backup_file" ) 2>&1 )"
 	if $res
 	then
-		echo "* Success" | tee -a "$backup_path/$log_file"
+		status ok "* Success" | tee -a "$backup_path/$log_file"
 	else
-		echo "* ERROR: $res" | tee -a "$backup_path/$log_file"
+		status fail "* ERROR: $res" | tee -a "$backup_path/$log_file"
 		return 1
 	fi
 
-	echo "Compressing backup to ZIP archive..." | tee -a "$backup_path/$log_file"
+	echo "Compressing database backup to ZIP archive..." | tee -a "$backup_path/$log_file"
 	# Zip with maximum compression. Run at low priority.
 	res="$( nice -n 10 zip -j -m -q -T -9 "$backup_path/$backup_file.zip" "$backup_path/$backup_file" )"
 	if $res
 	then
-		echo "* Success" | tee -a "$backup_path/$log_file"
+		status ok "* Success" | tee -a "$backup_path/$log_file"
 	else
-		echo "* ERROR: $res" | tee -a "$backup_path/$log_file"
+		status fail "* ERROR: $res" | tee -a "$backup_path/$log_file"
 		return 1
 	fi
 
@@ -98,6 +103,9 @@ backup_database() {
 }
 
 
+############################
+# WEB DATA BACKUP
+############################
 backup_app_data() {
 	local start=$(date +%s)
 	local backup_file="${date_start}_partkeepr-data-backup.zip"
@@ -109,9 +117,9 @@ backup_app_data() {
 	res="$( nice -n 10 zip -q -r -T -9 "$backup_path/$backup_file" "$partkeepr_data_path" )"
 	if $res
 	then
-		echo "* Success" | tee -a "$backup_path/$log_file"
+		status ok "* Success" | tee -a "$backup_path/$log_file"
 	else
-		echo "* ERROR: $res" | tee -a "$backup_path/$log_file"
+		status fail "* ERROR: $res" | tee -a "$backup_path/$log_file"
 		return 1
 	fi
 
@@ -120,6 +128,9 @@ backup_app_data() {
 }
 
 
+############################
+# CONFIG BACKUP
+############################
 backup_app_config() {
 	local start=$(date +%s)
 	local backup_file="${date_start}_partkeepr-config-backup.zip"
@@ -131,9 +142,9 @@ backup_app_config() {
 	res="$( nice -n 10 zip -q -r -T -9 "$backup_path/$backup_file" "$partkeepr_config_path" )"
 	if $res
 	then
-		echo "* Success" | tee -a "$backup_path/$log_file"
+		status ok "* Success" | tee -a "$backup_path/$log_file"
 	else
-		echo "* ERROR: $res" | tee -a "$backup_path/$log_file"
+		status fail "* ERROR: $res" | tee -a "$backup_path/$log_file"
 		return 1
 	fi
 
