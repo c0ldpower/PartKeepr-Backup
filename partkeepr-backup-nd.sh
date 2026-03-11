@@ -16,16 +16,18 @@
 # - Licence: MIT (see the LICENSE file)
 
 
-ver="0.1.3.003a"
+ver="0.1.3.004"
 echo "PartKeepr Backup $ver"
 
-# ——————————————
-# Command line options
-# ——————————————
-
+# ------------------------
+# DEFAULT FLAGS
+# ------------------------
 ONLY_DB=0
 NO_DATA=0
 
+# ------------------------
+# PARSE COMMAND-LINE ARGUMENTS
+# ------------------------
 while [ $# -gt 0 ]; do
     case "$1" in
         --only-db)
@@ -42,8 +44,16 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-# Source the script settings
-. ./partkeepr-backup.properties
+# ------------------------
+# LOAD CONFIG
+# ------------------------
+# Make sure partkeepr-backup.properties exists and uses shell-compatible syntax
+if [ -f "./partkeepr-backup.properties" ]; then
+    . ./partkeepr-backup.properties
+else
+    status fail "Configuration file partkeepr-backup.properties not found!"
+    exit 1
+fi
 
 # ========================
 # COLOURS (ANSI escape codes)
@@ -201,6 +211,23 @@ if [ "$ONLY_DB" -eq 0 ]; then
     backup_app_config
 else
     status warn "Skipping config backup (option specified)"
+fi
+
+# ========================
+# Cleanup old backups and logs
+# ========================
+if [ -z "$data_retention_period" ] || [ "$data_retention_period" -eq 0 ]; then
+    status info "Old backup cleanup disabled in config"
+else
+    status info "Removing backups and logs older than ${data_retention_period} days"
+
+	# remove old backup files
+    find "$BACKUP_DIR" -type f -mtime +$data_retention_period -print -delete 2>/dev/null
+	
+	# remove old log files
+    find "$LOG_DIR" -type f -mtime +$data_retention_period -print -delete 2>/dev/null
+
+    status ok "Old backup cleanup finished"
 fi
 
 # ========================
