@@ -16,7 +16,7 @@
 # - Licence: MIT (see the LICENSE file)
 
 
-ver="0.1.3.003"
+ver="0.1.3.003a"
 echo "PartKeepr Backup $ver"
 
 # ——————————————
@@ -193,14 +193,14 @@ backup_database
 if [ "$NO_DATA" -eq 0 ] && [ "$ONLY_DB" -eq 0 ]; then
     backup_app_data
 else
-    status info "Skipping web data backup (option specified)"
+    status warn "Skipping web data backup (option specified)"
 fi
 
 # only run config if NOT only-db
 if [ "$ONLY_DB" -eq 0 ]; then
     backup_app_config
 else
-    status info "Skipping config backup (option specified)"
+    status warn "Skipping config backup (option specified)"
 fi
 
 # ========================
