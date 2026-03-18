@@ -216,16 +216,43 @@ fi
 # ========================
 # Cleanup old backups and logs
 # ========================
+
+TODAY=$(date +%F)
+
 if [ -z "$data_retention_period" ] || [ "$data_retention_period" -eq 0 ]; then
-    status info "Old backup cleanup disabled in config"
+    status info "Old backup cleanup disabled (data_retention_period=0)"
 else
     status info "Removing backups and logs older than ${data_retention_period} days"
 
-	# remove old backup files
-    find "$BACKUP_DIR" -type f -mtime +$data_retention_period -print -delete 2>/dev/null
-	
-	# remove old log files
-    find "$LOG_DIR" -type f -mtime +$data_retention_period -print -delete 2>/dev/null
+    # cleanup backups
+    if [ -n "$backup_path" ] && [ "$backup_path" != "/" ]; then
+        OLD_BACKUPS=$(find "$backup_path" -type f -mtime +$data_retention_period 2>/dev/null)
+        COUNT=$(printf "%s\n" "$OLD_BACKUPS" | grep -c .)
+
+        status info "Found $COUNT old backup files"
+
+        if [ "$COUNT" -gt 0 ]; then
+            find "$backup_path" -type f -mtime +$data_retention_period -delete
+            status ok "Deleted $COUNT old backup files"
+        fi
+    else
+        status warn "Skipping backup cleanup: backup_path invalid"
+    fi
+
+    # cleanup logs (exclude today’s active log)
+    if [ -n "$LOG_DIR" ] && [ "$LOG_DIR" != "/" ]; then
+        OLD_LOGS=$(find "$LOG_DIR" -type f -mtime +$data_retention_period ! -name "backup-${TODAY}*" 2>/dev/null)
+        COUNT=$(printf "%s\n" "$OLD_LOGS" | grep -c .)
+
+        status info "Found $COUNT old log files"
+
+        if [ "$COUNT" -gt 0 ]; then
+            find "$LOG_DIR" -type f -mtime +$data_retention_period ! -name "backup-${TODAY}*" -delete
+            status ok "Deleted $COUNT old log files"
+        fi
+    else
+        status warn "Skipping log cleanup: LOG_DIR invalid"
+    fi
 
     status ok "Old backup cleanup finished"
 fi
